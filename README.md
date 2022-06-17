@@ -11,3 +11,11 @@ def load_pxml(filename: str) -> PageXMLPage:
     return page
 ```
 
+**Writing PageXML files**
+```
+from libpagexml3.libpagexml3 import PageXMLBuilder, PageXMLPage
+
+def write_pxml(page: PageXMLPage) -> str:
+    pstr = PageXMLBuilder.build_page(page=page, creator="DemoScript")
+    return pstr
+```
