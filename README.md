@@ -1,5 +1,24 @@
 # Library to read and write PageXML files
 
+## Installation
+
+##### Add to your project
+Add this line:
+
+```
+"libpagexml3 @ git+https://gitlab2.informatik.uni-wuerzburg.de/nof36hn/libpagexml3.git"
+```
+
+to your `pyproject.toml`in the `[project]`section in the `depedencies` list
+
+##### Install into your own VirtualEnv
+```
+# clone the repository
+git clone https://gitlab2.informatik.uni-wuerzburg.de/nof36hn/libpagexml3.git
+cd libpagexml3
+pip install . # install the project into your activated virtual environment
+```
+
 ## Basic Usage
 
 **Loading a Document**
