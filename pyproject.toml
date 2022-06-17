@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools", "setuptools-scm"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "libpagexml3"
+description = "Library for reading, writing PageXML files"
+readme = "README.md"
+keywords = ["evaluation", "pagesegmentation"]
+license = {text = "BSD 3-Clause License"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "loguru",
+    "numpy"
+]
+dynamic = ["version"]
+
+[tool.setuptools]
+    packages = ["libpagexml3"]
