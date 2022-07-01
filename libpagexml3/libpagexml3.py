@@ -460,7 +460,7 @@ class PageXMLParser:
                 raise PageXMLInvalid("Only supports Text Equiv index of 0 or 1")
             elif uc is None:
                 logger.warning(f"TextEquiv has no <Unicode> tag... Loading TextEquivText in {self.image_filename}")
-                teq[idx] = TextEquiv(index=idx, text=te.text)
+                teq[idx] = TextEquiv(index=idx, text=te.text or "")
             else:
                 teq[idx] = TextEquiv(index=idx, text=uc)
 
