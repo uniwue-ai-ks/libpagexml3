@@ -54,6 +54,10 @@ class PageRegionTypes(enum.Enum):
     def is_text(self):
         return self == PageRegionTypes.TEXT_REGION
 
+    @classmethod
+    def supported_regions(cls):
+        return set(e.value for e in cls)
+
 
 class PageXMLTextTypes(enum.Enum):
     PARAGRAPH = 'paragraph'
@@ -601,28 +605,37 @@ class PageXMLParser:
 
         self.reading_order = ReadingOrder()
         self.regions = []
+        reading_order_query = None
         for element in page:
             tagstr = self._remove_namespace_from_tag(element.tag)
             # check if we ignore this tag
             if PageRegionTypes.should_ignore(tagstr):
                 continue
-            else:
-                if tagstr == "ReadingOrder":
-                    self.reading_order = self.parse_reading_order(element, tagstr, namespace)
+            elif tagstr == "ReadingOrder":
+                if reading_order_query is not None:
+                    raise PageXMLInvalid("Multiple ReadingOrders")
                 else:
-                    region = self._parse_region(element, tagstr, namespace)
-                    if region is None:
-                        if self.strictness is not PageXMLParserMode.EASY:
-                            raise PageXMLInvalid("Parsing returned None")
-                        else:
-                            continue
+                    reading_order_query = (element, tagstr, namespace)
+            elif tagstr in PageRegionTypes.supported_regions():
+                region = self._parse_region(element, tagstr, namespace)
+                if region is None:
+                    if self.strictness is not PageXMLParserMode.EASY:
+                        raise PageXMLInvalid("Parsing returned None")
+                    else:
+                        continue
 
-                    if region.region_text_type is not None and \
-                       region.region_text_type in PageXMLTextTypes.ignore_at_load_types():
-                        print(f"WARNING: Ignore region {region.region_id} with text type {region.region_text_type} in file {filename}", file=sys.stderr)
-                        continue # ignore this, but print a warning
-                    self.regions.append(region)
-
+                if region.region_text_type is not None and \
+                   region.region_text_type in PageXMLTextTypes.ignore_at_load_types():
+                    logger.warning(f"Ignore region {region.region_id} with text type {region.region_text_type} in file {filename}")
+                    continue
+                self.regions.append(region)
+            elif tagstr in {"Relations"}:
+                pass # we do not care about the relations type
+            else:
+                if self.strictness is not PageXMLParserMode.EASY:
+                    raise PageXMLInvalid(f"Unsupported XML Tag Type {tagstr} in {filename}")
+        if reading_order_query is not None:
+            self.reading_order = self.parse_reading_order(*reading_order_query)
         if self.is_superstrict():
             self.check_validity()
         # build the lookup tables
@@ -652,13 +665,18 @@ class PageXMLParser:
             raise PageXMLInvalid("More than one Ordered Group in Reading Order in PageXML.")
         for group in element:
             assert group.tag == namespace+"OrderedGroup"
-
+            indexed_reg = []
             for assumed_idx, refidx in enumerate(group):
                 if not refidx.tag == namespace+"RegionRefIndexed":
                     raise PageXMLInvalid("OrderedGroup contains something else than refidx tags")
                 if not assumed_idx == int(refidx.attrib["index"]):
-                    raise PageXMLInvalid("Region references are not incrementing")
-                reading_order.order.append(refidx.attrib["regionRef"])
+                    logger.warning(f"Region References are not incrementing in reading Order in file {self.image_filename}")
+                indexed_reg.append((int(refidx.attrib["index"]), refidx.attrib["regionRef"]))
+            indexed_reg = sorted(indexed_reg,key=lambda x:x[0])
+
+            for i,r in indexed_reg:
+                reading_order.order.append(r)
+
         return reading_order
 
 
