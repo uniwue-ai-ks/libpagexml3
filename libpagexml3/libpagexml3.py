@@ -369,7 +369,7 @@ class PageXMLPage:
     def rescale_to(self, target_width: int, target_height: int):
         rescale_factor = float(0.5 * ((target_width / self.image_width) + (target_height / self.image_height)))
         self.rescale(rescale_factor)
-        assert self.image_width == target_width and self.image_height == target_height
+       # assert self.image_width == target_width and self.image_height == target_height
         self.image_width = target_width
         self.image_height = target_height
 
