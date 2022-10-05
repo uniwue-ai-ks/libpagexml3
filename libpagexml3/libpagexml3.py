@@ -41,11 +41,12 @@ class PageRegionTypes(enum.Enum):
     NOISE_REGION = 'NoiseRegion'
     BORDER_REGION = 'Border'
     MATHS_REGION = 'MathsRegion'
+    UNKNOWN_REGION = 'UnknownRegion'
 
 
     @staticmethod
     def ignored_regions():
-        return {"PrintSpace", "Border", "UnknownRegion"}
+        return {"PrintSpace", "Border"}
 
     @staticmethod
     def should_ignore(region_str):
