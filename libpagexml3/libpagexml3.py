@@ -82,6 +82,7 @@ class PageXMLTextTypes(enum.Enum):
     FOOTNOTE = 'footnote'
     FOOTNOTE_CONTINUED = 'footnote_continued'
     FOOTER = 'footer'
+    COLUMN = 'column'
     CREDIT = 'credit'
     EMPTY = ''
 
@@ -105,6 +106,7 @@ class PageXMLTextTypes(enum.Enum):
             PageXMLTextTypes.FOOTNOTE_CONTINUED: (0, 125, 0),
             PageXMLTextTypes.FOOTER: (0, 123, 0),
             PageXMLTextTypes.CREDIT: (0, 133, 0),
+
         }[self]
 
     @staticmethod
