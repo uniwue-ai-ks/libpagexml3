@@ -141,6 +141,7 @@ class TextEquiv:
 
     TEXT_ID_GROUND_TRUTH = 0
     TEXT_ID_PREDICTION = 1
+    TEXT_ID_GREEK_CORRECTION = 2
 
     def is_gt(self):
         return self.index == TextEquiv.TEXT_ID_GROUND_TRUTH
@@ -461,10 +462,10 @@ class PageXMLParser:
         for te in text_equivs:
             uc = te.find(namespace + "Unicode").text
             idx = int(te.attrib["index"]) if "index" in te.attrib else -1
-            if idx == -1:
+            if idx <= -1:
                 logger.warning(f"Skipping TextEquiv with no index in {self.image_filename}")
-            elif idx != 0 and idx != 1:
-                raise PageXMLInvalid("Only supports Text Equiv index of 0 or 1")
+            #elif idx != 0 and idx != 1:
+            #    raise PageXMLInvalid("Only supports Text Equiv index of 0 or 1")
             elif uc is None:
                 logger.warning(f"TextEquiv has no <Unicode> tag... Loading TextEquivText in {self.image_filename}")
                 teq[idx] = TextEquiv(index=idx, text=te.text or "")
