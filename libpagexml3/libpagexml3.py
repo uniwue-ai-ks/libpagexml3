@@ -68,6 +68,7 @@ class PageXMLTextTypes(enum.Enum):
     PAGE_NUMBER = 'page_number'
     SIGNATURE_MARK = 'signature_mark'
     MARGINALIA = 'marginalia'
+    SPEAKER_MARGINLIA = 'speaker_marginalia'
     OTHER = 'other'
     DROP_CAPITAL = 'drop_capital'
     CAPITAL_WORD = 'capital_word'
@@ -115,7 +116,7 @@ class PageXMLTextTypes(enum.Enum):
 
     @staticmethod
     def image_types():
-        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE}
+        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPITAL_WORD, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE}
 
     @staticmethod
     def ignore_at_load_types():
