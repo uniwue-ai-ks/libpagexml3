@@ -3,6 +3,7 @@ import dataclasses
 import enum
 import functools
 import itertools
+import json
 import math
 import re
 import sys
@@ -85,7 +86,6 @@ class PageXMLTextTypes(enum.Enum):
     FOOTER = 'footer'
     COLUMN = 'column'
     CREDIT = 'credit'
-    DUMMY_BASELINE = "dummy_baseline"
     EMPTY = ''
 
     def color(self):
@@ -108,8 +108,6 @@ class PageXMLTextTypes(enum.Enum):
             PageXMLTextTypes.FOOTNOTE_CONTINUED: (0, 125, 0),
             PageXMLTextTypes.FOOTER: (0, 123, 0),
             PageXMLTextTypes.CREDIT: (0, 133, 0),
-            PageXMLTextTypes.DUMMY_BASELINE: (0, 0, 80),
-
         }[self]
 
     @staticmethod
@@ -297,6 +295,27 @@ class ReadingOrder:
 class InvalidLookup(Exception):
     pass
 
+class ExtraElementTypes(enum.Enum):
+    BASELINE = "baseline"
+
+class IExtraElement(abc.ABC):
+    def get_id(self) -> str:
+        pass
+    def get_type(self) -> ExtraElementTypes:
+        pass
+
+    def export(self) -> dict:
+        pass
+
+@dataclass
+class ExtraElementBaseline(IExtraElement):
+    id: str
+    type: ExtraElementTypes
+    baseline: np.ndarray
+
+    def export(self) -> dict:
+        return {"id": self.id, "type": self.type.value, "data": self.baseline if isinstance(self.baseline,list) else self.baseline.tolist()}
+
 @dataclass
 class PageXMLPage:
     image_filename: str
@@ -309,6 +328,7 @@ class PageXMLPage:
     _lookups: PageLookups = None
     reading_order: ReadingOrder = None
     creator: str = None
+    extra_elements: List[IExtraElement] = field(default_factory=list)
 
 
     def rebuild_lookups(self):
@@ -564,9 +584,18 @@ class PageXMLParser:
         )
 
     @staticmethod
-    def from_file(filename, rescale=None, strictness: PageXMLParserMode = PageXMLParserMode.SUPERSTRICT):
+    def from_file(filename, rescale=None, strictness: PageXMLParserMode = PageXMLParserMode.EASY):
         with open(filename) as f:
             return PageXMLParser(f.read(), filename, rescale=rescale, strictness=strictness)
+
+    def _parse_extra_elements(self, elem: ET.Element):
+        assert elem.attrib["name"] == "extra_elements"
+        extra_elems = json.loads(elem.attrib["value"]) # this has to be a list
+        for e in extra_elems:
+            if e["type"] == "baseline":
+                self.extra_elements.append(ExtraElementBaseline(e["id"],ExtraElementTypes.BASELINE,np.array(e["data"],dtype=float)))
+            else:
+                raise PageXMLInvalid(f"Unsupported Extra element: {e}")
 
     def __init__(self, pagexml, filename=None, rescale=None, strictness:PageXMLParserMode = PageXMLParserMode.SUPERSTRICT,
                  text_mode: PageXMLParserTextMode = PageXMLParserTextMode.EQUIV):
@@ -577,6 +606,7 @@ class PageXMLParser:
         namespace: str = root.tag.split('}')[0] + "}"
         page: ET.Element = root.find(namespace + "Page")
         self.strictness = strictness
+        self.extra_elements: List[IExtraElement] = []
         if not self.is_strict():
             if not PageXMLParser.printed_strict_mode_warning:
                 logger.warning(f"Warn: Strict mode is disabled for libpagexml")
@@ -636,6 +666,11 @@ class PageXMLParser:
                     logger.warning(f"Ignore region {region.region_id} with text type {region.region_text_type} in file {filename}")
                     continue
                 self.regions.append(region)
+            elif tagstr == "UserDefined":
+                user_attribute = element.find(namespace + "UserAttribute")
+                if user_attribute is not None and user_attribute.attrib["name"] == "extra_elements":
+                    self._parse_extra_elements(user_attribute)
+
             elif tagstr in {"Relations"}:
                 pass # we do not care about the relations type
             else:
@@ -704,7 +739,7 @@ class PageXMLParser:
     def get_page(self) -> PageXMLPage:
         page = PageXMLPage(image_filename=self.image_filename, image_width=self.image_width, image_height=self.image_height,
                            regions = self.regions, created_on=datetime.datetime.now().isoformat(),
-                           last_edited=datetime.datetime.now().isoformat(), reading_order=self.reading_order)
+                           last_edited=datetime.datetime.now().isoformat(), reading_order=self.reading_order,extra_elements=self.extra_elements)
         return page
 
     def check_validity(self):
@@ -826,6 +861,20 @@ class PageXMLBuilder:
         out.append("</TextLine>\n")
 
     @classmethod
+    def push_extra_elements(cls, out: List[str], extra_elements: List[IExtraElement]):
+        elems = [x.export() for x in extra_elements]
+        extra_elements_data = json.dumps(elems)
+
+        table = str.maketrans({
+            "<": "&lt;",
+            ">": "&gt;",
+            "&": "&amp;",
+            "'": "&apos;",
+            '"': "&quot;",
+        })
+        out.append(f'\n<UserDefined><UserAttribute name="extra_elements" description="Extra Elements on the page" type="extra_elements" value="{extra_elements_data.translate(table)}" /></UserDefined>')
+
+    @classmethod
     def push_region(cls, out: List[str], reg: PageRegion):
 
         #if reg.region_text_type is not None and reg.region_text_type.value != "":
@@ -862,5 +911,7 @@ class PageXMLBuilder:
 
         for reg in page.regions:
             cls.push_region(contents, reg)
+        print(f"Pushing extra elements: {page.extra_elements}")
+        cls.push_extra_elements(contents, page.extra_elements)
         contents.append("\n</Page></PcGts>\n")
         return "".join(contents)
