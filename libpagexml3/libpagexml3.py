@@ -370,7 +370,10 @@ class PageXMLPage:
         return list(itertools.chain.from_iterable(self.region_by_id(r_id).text_lines for r_id in self.reading_order.order))
 
     def baselines(self) -> List[np.ndarray]:
-        return [t.baseline for t in self.text_lines()]
+        # TODO: should this be the default behaviour?
+        # Does it break anything?
+        return [t.baseline for t in self.text_lines()] + [t.baseline for t in self.extra_elements if t.get_type() == ExtraElementTypes.BASELINE] 
+
 
     def region_by_id(self, id):
         try:
