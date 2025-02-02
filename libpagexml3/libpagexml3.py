@@ -85,6 +85,7 @@ class PageXMLTextTypes(enum.Enum):
     FOOTER = 'footer'
     COLUMN = 'column'
     CREDIT = 'credit'
+    DUMMY_BASELINE = "dummy_baseline"
     EMPTY = ''
 
     def color(self):
@@ -107,6 +108,7 @@ class PageXMLTextTypes(enum.Enum):
             PageXMLTextTypes.FOOTNOTE_CONTINUED: (0, 125, 0),
             PageXMLTextTypes.FOOTER: (0, 123, 0),
             PageXMLTextTypes.CREDIT: (0, 133, 0),
+            PageXMLTextTypes.DUMMY_BASELINE: (0, 0, 80),
 
         }[self]
 
@@ -116,7 +118,7 @@ class PageXMLTextTypes(enum.Enum):
 
     @staticmethod
     def image_types():
-        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPITAL_WORD, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE}
+        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPITAL_WORD, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE, PageXMLTextTypes.DUMMY_BASELINE}
 
     @staticmethod
     def ignore_at_load_types():
