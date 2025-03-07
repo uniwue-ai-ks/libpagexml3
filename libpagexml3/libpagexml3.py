@@ -199,6 +199,15 @@ class TextLine(PolygonRegionBase):
         return TextEquiv.TEXT_ID_GROUND_TRUTH in self.text_equivs
     def has_pred_text(self):
         return TextEquiv.TEXT_ID_PREDICTION in self.text_equivs
+    
+    def bounding_box(self):
+        if self.polygon is None:
+            raise RuntimeError(f"Bounding box for Textline {self.id} is not defined")
+        xmin = int(np.min(self.polygon[:, 0]))
+        xmax = int(np.max(self.polygon[:, 0]))
+        ymin = int(np.min(self.polygon[:, 1]))
+        ymax = int(np.max(self.polygon[:, 1]))
+        return PageRegionBB(xmin, ymin, xmax, ymax, None) # set it to none, as we don't know, if this is a text type
 
 @dataclass
 class PageRegion(PolygonRegionBase):
