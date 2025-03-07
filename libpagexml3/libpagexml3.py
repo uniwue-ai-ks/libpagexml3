@@ -116,7 +116,7 @@ class PageXMLTextTypes(enum.Enum):
 
     @staticmethod
     def image_types():
-        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPITAL_WORD, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE, PageXMLTextTypes.DUMMY_BASELINE}
+        return {PageXMLTextTypes.DROP_CAPITAL, PageXMLTextTypes.CAPITAL_WORD, PageXMLTextTypes.CAPTION, PageXMLTextTypes.IGNORE}
 
     @staticmethod
     def ignore_at_load_types():
@@ -612,7 +612,7 @@ class PageXMLParser:
         self.extra_elements: List[IExtraElement] = []
         if not self.is_strict():
             if not PageXMLParser.printed_strict_mode_warning:
-                logger.warning(f"Warn: Strict mode is disabled for libpagexml")
+                #logger.warning(f"Warn: Strict mode is disabled for libpagexml")
                 PageXMLParser.printed_strict_mode_warning = True
             # TODO: is superstrict a requirement
 
@@ -914,7 +914,7 @@ class PageXMLBuilder:
 
         for reg in page.regions:
             cls.push_region(contents, reg)
-        print(f"Pushing extra elements: {page.extra_elements}")
+        #print(f"Pushing extra elements: {page.extra_elements}")
         cls.push_extra_elements(contents, page.extra_elements)
         contents.append("\n</Page></PcGts>\n")
         return "".join(contents)
