@@ -87,6 +87,15 @@ class PageXMLTextTypes(enum.Enum):
     COLUMN = 'column'
     CREDIT = 'credit'
     EMPTY = ''
+    # grimm specific
+    GRIMM_JAKOB = 'jakob_grimm'
+    GRIMM_WILHELM = 'wilhelm_grimm'
+    ANDERE_HANDSCHRIFT = 'andere_handschrift'
+    UNTERSTRICHEN = 'unterstrichen'
+    DURCHGESTRICHEN = 'durchgestrichen'
+    ANGESTRICHEN = 'angestrichen'
+    ANDERE_LINIE = 'andere_linie'
+    
 
     def color(self):
         return {
