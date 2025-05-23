@@ -315,6 +315,7 @@ class InvalidLookup(Exception):
 
 class ExtraElementTypes(enum.Enum):
     BASELINE = "baseline"
+    GENERIC_ELEMENT="generic_element"
 
 class IExtraElement(abc.ABC):
     def get_id(self) -> str:
@@ -333,6 +334,23 @@ class ExtraElementBaseline(IExtraElement):
 
     def export(self) -> dict:
         return {"id": self.id, "type": self.type.value, "data": self.baseline if isinstance(self.baseline,list) else self.baseline.tolist()}
+
+@dataclass
+class ExtraElementGeneric(IExtraElement):
+    id: str
+    type: ExtraElementTypes
+    shape: np.ndarray
+    shape_type: str
+    properties: dict
+
+    def export(self) -> dict:
+        return {"id": self.id, 
+                "type": self.type.value, 
+                "shape": self.shape if isinstance(self.shape, list) else self.shape.tolist(),
+                "shape_type": self.shape_type,
+                "properties": self.properties
+               }
+
 
 @dataclass
 class PageXMLPage:
@@ -615,6 +633,8 @@ class PageXMLParser:
         for e in extra_elems:
             if e["type"] == "baseline":
                 self.extra_elements.append(ExtraElementBaseline(e["id"],ExtraElementTypes.BASELINE,np.array(e["data"],dtype=float)))
+            elif e["type"] == "generic_element":
+                self.extra_elements.append(ExtraElementGeneric(e["id"],ExtraElementTypes.GENERIC_ELEMENT,np.array(e["shape"],dtype=float),shape_type=e["shape_type"],properties=e["properties"]))
             else:
                 raise PageXMLInvalid(f"Unsupported Extra element: {e}")
 
