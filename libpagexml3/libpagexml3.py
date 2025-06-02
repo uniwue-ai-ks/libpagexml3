@@ -93,6 +93,7 @@ class PageXMLTextTypes(enum.Enum):
     ANDERE_HANDSCHRIFT = 'andere_handschrift'
     UNTERSTRICHEN = 'unterstrichen'
     DURCHGESTRICHEN = 'durchgestrichen'
+    UNTERPUNKTET = 'unterpunktet'
     ANGESTRICHEN = 'angestrichen'
     ANDERE_LINIE = 'andere_linie'
     
