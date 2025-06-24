@@ -2,7 +2,7 @@ from .libpagexml3 import *
 import datetime
 
 
-class PAGE2019Builder:
+class PAGE2017Builder:
     @staticmethod
     def baseline_to_elem(tl: TextLine) -> str:
         stro = [f"{round(x[0])},{round(x[1])}" for x in tl.baseline] # in pagexml, all of these have to be integers
@@ -50,7 +50,7 @@ class PAGE2019Builder:
 
 <PcGts xmlns="http://schema.primaresearch.org/PAGE/gts/pagecontent/2017-07-15"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2017-07-15/pagecontent.xsd">
+    xsi:schemaLocation="http://schema.primaresearch.org/PAGE/gts/pagecontent/2017-07-15 http://schema.primaresearch.org/PAGE/gts/pagecontent/2017-07-15/pagecontent.xsd">
 <Metadata>
 <Creator>{creator or page.creator or "LibPageXML2 (generic)"}</Creator>
 <Created>{datetime.datetime.now().isoformat()}</Created>

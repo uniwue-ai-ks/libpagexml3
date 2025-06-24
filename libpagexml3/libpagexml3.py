@@ -97,6 +97,7 @@ class PageXMLTextTypes(enum.Enum):
     KORREKTURZEICHEN = 'korrekturzeichen'
     UNTERSTRICHEN = 'unterstrichen'
     DURCHGESTRICHEN = 'durchgestrichen'
+    UNTERPUNKTET = 'unterpunktet'
     DOPPELT_UNTERSTRICHEN = 'doppelt_unterstrichen'
     ANGESTRICHEN = 'angestrichen'
     ANDERE_LINIE = 'andere_linie'
