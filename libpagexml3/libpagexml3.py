@@ -90,12 +90,17 @@ class PageXMLTextTypes(enum.Enum):
     # grimm specific
     GRIMM_JAKOB = 'jakob_grimm'
     GRIMM_WILHELM = 'wilhelm_grimm'
+    GRIMM_JAKOB_ODER_WILHELM = 'jakob_oder_wilhelm_grimm'
     ANDERE_HANDSCHRIFT = 'andere_handschrift'
+    UNSICHERE_HAND = 'unsichere_hand'
+    EINWEISUNGSZEICHEN = 'einweisungszeichen'
+    KORREKTURZEICHEN = 'korrekturzeichen'
     UNTERSTRICHEN = 'unterstrichen'
     DURCHGESTRICHEN = 'durchgestrichen'
+    DOPPELT_UNTERSTRICHEN = 'doppelt_unterstrichen'
     ANGESTRICHEN = 'angestrichen'
     ANDERE_LINIE = 'andere_linie'
-    
+    UNSICHER = 'unsicher'
 
     def color(self):
         return {
