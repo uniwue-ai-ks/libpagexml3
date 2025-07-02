@@ -93,6 +93,7 @@ class PageXMLTextTypes(enum.Enum):
     GRIMM_JAKOB_ODER_WILHELM = 'jakob_oder_wilhelm_grimm'
     ANDERE_HANDSCHRIFT = 'andere_handschrift'
     UNSICHERE_HAND = 'unsichere_hand'
+    UNLESERLICHE_HANDSCHRIFT = 'unleserliche_handschrift'
     EINWEISUNGSZEICHEN = 'einweisungszeichen'
     KORREKTURZEICHEN = 'korrekturzeichen'
     UNTERSTRICHEN = 'unterstrichen'
