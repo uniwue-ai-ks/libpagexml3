@@ -11,7 +11,7 @@ import xml.etree.ElementTree as ET
 import xml.sax.saxutils
 from collections import namedtuple, defaultdict
 from dataclasses import dataclass, field
-from typing import List, Dict
+from typing import List, Dict, Optional
 import datetime
 
 import numpy as np
@@ -103,6 +103,21 @@ class PageXMLTextTypes(enum.Enum):
     ANGESTRICHEN = 'angestrichen'
     ANDERE_LINIE = 'andere_linie'
     UNSICHER = 'unsicher'
+
+    # Pfundschreibungen
+    PF_TABELLE_AV_SCHULEN = 'pf_tabelle_av_schulen'
+    PF_TABELLE_BI_GRUNDSTUECK = 'pf_tabelle_bi_grundstueck'
+    PF_TABELLE_ACKER = 'pf_tabelle_acker'
+    PF_TABELLE_AKZIDENZIEN_STOLE = 'pf_tabelle_akzidenzien_stole'
+    PF_TABELLE_AKZIDENZIEN_ANDERE = 'pf_tabelle_akzidenzien_andere'
+    PF_TABELLE_PFARRSPRENGEL = 'pf_tabelle_pfarrsprengel'
+    PF_TABELLE_EINNAHMEN = 'pf_tabelle_einnahmen'
+    PF_ABSCHNITT_HEADLINE = 'pf_abschnitt_headline'
+    PF_KAPITEL_HEADLINE = 'pf_kapitel_headline'
+    PF_UNTERKAPITEL_HEADLINE = 'pf_unterkapitel_headline'
+    PF_NUMMERIERUNG_HEADLINE = 'pf_nummerierung_headline'
+    PF_AUFZAEHLUNG_HEADLINE = 'pf_aufzaehlung_headline'
+    PF_UNTERAUFZAEHLUNG_HEADLINE = 'pf_unteraufzaehlung_headline'
 
     def color(self):
         return {
@@ -202,6 +217,14 @@ class TextLine(PolygonRegionBase):
 
     def get_text_pred(self) -> str:
         return self.text_equivs.get(TextEquiv.TEXT_ID_PREDICTION, TextEquiv(1,"")).text
+    def get_any_text(self, order: Optional[List[TextEquiv]] = None, default: Optional[str] = None) -> Optional[str]:
+        if order is None:
+            order = [TextEquiv.TEXT_ID_GREEK_CORRECTION, TextEquiv.TEXT_ID_GROUND_TRUTH, TextEquiv.TEXT_ID_PREDICTION]
+        for o in order:
+            if o in self.text_equivs:
+                return self.text_equivs[o].text
+        else:
+            return default
 
     def get_ordering_heur(self) -> float:
         if self.baseline is not None:
