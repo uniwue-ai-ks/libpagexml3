@@ -1,15 +1,14 @@
 import abc
 import dataclasses
 import enum
-import functools
 import itertools
 import json
 import math
 import re
-import sys
 import xml.etree.ElementTree as ET
+#import lxml.etree as ET
 import xml.sax.saxutils
-from collections import namedtuple, defaultdict
+from collections import namedtuple
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional
 import datetime
@@ -189,6 +188,51 @@ class TextEquiv:
 def _scale_pxml_array(array, scale_factor: float):
     return np.array(array * scale_factor + 0.5, dtype=np.int)
 
+class TextEquivable:
+    """
+    text_equivs: Dict[int, str]
+
+    def has(self, key: int):
+        return id in self.text_equivs
+    def get_or_else(self, key: int, default: Optional[str] = None):
+        return self.text_equivs.get(id,)
+    """
+
+    
+@dataclass
+class TLGlyph(TextEquivable):
+    id: str
+    polygon: np.ndarray
+    text_equivs: Dict[int, str] = field(default_factory=dict)
+
+    def bounding_box(self) -> PageRegionBB:
+        xmin = int(np.min(self.polygon[:, 0]))
+        xmax = int(np.max(self.polygon[:, 0]))
+        ymin = int(np.min(self.polygon[:, 1]))
+        ymax = int(np.max(self.polygon[:, 1]))
+        return PageRegionBB(xmin, ymin, xmax, ymax, None) # set it to none, as we don't know, if this is a text type
+
+@dataclass
+class TLWord(TextEquivable):
+    id: str
+    polygon: np.ndarray
+    text_equivs: Dict[int,str] = field(default_factory=dict)
+    glyphs: Optional[List[TLGlyph]] = None
+
+    def bounding_box(self) -> PageRegionBB:
+        xmin = int(np.min(self.polygon[:, 0]))
+        xmax = int(np.max(self.polygon[:, 0]))
+        ymin = int(np.min(self.polygon[:, 1]))
+        ymax = int(np.max(self.polygon[:, 1]))
+        return PageRegionBB(xmin, ymin, xmax, ymax, None) # set it to none, as we don't know, if this is a text type
+    
+
+        
+
+
+
+
+
 @dataclass
 class TextLine(PolygonRegionBase):
 
@@ -197,6 +241,7 @@ class TextLine(PolygonRegionBase):
     polygon: np.array
     baseline: np.array = None
     text_equivs: Dict[int, TextEquiv] = field(default_factory=dict)
+    tl_words: Optional[List[TLWord]] = None
 
     def has_baseline(self) -> np.ndarray:
         return self.baseline is not None
@@ -512,14 +557,73 @@ class PageXMLParser:
     def is_superstrict(self):
         return self.strictness is PageXMLParserMode.SUPERSTRICT
 
+    def _parse_text_equivs_to_dict_for_element(self, element, namespace):
+        text_equivs = element.findall(namespace+"TextEquiv")
+        teq = dict()
+        for te in text_equivs:
+            uc = te.find(namespace + "Unicode").text
+            idx = int(te.attrib["index"]) if "index" in te.attrib else -1
+            if idx <= -1:
+                logger.warning(f"Skipping TextEquiv with no index in {self.image_filename}")
+            elif uc is None:
+                #logger.warning(f"TextEquiv has no <Unicode> tag... Loading TextEquivText in {self.image_filename}")
+                teq[idx] = te.text or ""
+            else:
+                teq[idx] = uc
+        return teq
+
+
+    def _parse_tl_words(self, element, namespace):
+        words = element.findall(namespace+"Word")
+        out_words = []
+
+        for word in words:
+            coords = word.find(namespace + "Coords")
+            if coords is None:
+                raise PageXMLInvalid("Textline > Word must have a coords array")
+            if "points" in coords.attrib:
+                word_coords = self._polygon_from_coords_str(str(coords.attrib["points"]))
+            w = TLWord(id=word.attrib["id"], polygon=word_coords,text_equivs=dict())
+            w.text_equivs = self._parse_text_equivs_to_dict_for_element(word,namespace)
+            out_words.append(w)
+
+            # continue parsing the glyphs of the word and append them to the word afterwards
+            glyphs = []
+
+            for glyph in word.findall(namespace+"Glyph"):
+                glyph_coords = glyph.find(namespace + "Coords")
+                if glyph_coords is None:
+                    raise PageXMLInvalid("Textline > Word > Glyph must have a coords array")
+                if "points" in glyph_coords.attrib:
+                    glyph_coords = self._polygon_from_coords_str(str(coords.attrib["points"]))
+                g = TLGlyph(id=glyph.attrib["id"], polygon=glyph_coords,text_equivs=dict())
+                g.text_equivs = self._parse_text_equivs_to_dict_for_element(glyph, namespace)
+                glyphs.append(g)
+            w.glyphs =  glyphs if len(glyphs) > 0 else None
+
+            
+
+        if out_words:
+            return out_words
+        else: 
+            return None
+        
+
     def _polygon_from_coords_str(self, coords_str: str) -> np.array:
         points = []
+        """for m in coords_str.split():
+            if not m: continue
+            x,y = m.split(",")
+            points.append((int(x), int(y)))
+        """ # above alternative split implementation is faster, but might not catch all possible errors during parsing
+        
         for match in PageXMLParser._coords_regex.finditer(coords_str):
             x, y = int(match.group(1)), int(match.group(3))
             if self.do_rescale:
                 x = int(x * self.rescale_factor_x)  # TODO: maybe use round() here !?!
                 y = int(y * self.rescale_factor_y)
             points.append((x, y))
+        
         return np.array(points)
 
     def _remove_namespace_from_tag(self, tagstring):
@@ -563,8 +667,9 @@ class PageXMLParser:
                 teq[idx] = TextEquiv(index=idx, text=te.text or "")
             else:
                 teq[idx] = TextEquiv(index=idx, text=uc)
-
-        return TextLine(id, parent_id, textline_polygon, baseline_points, text_equivs=teq)
+        # parse words and glpyhs
+        tl_words = self._parse_tl_words(element,namespace)
+        return TextLine(id, parent_id, textline_polygon, baseline_points, text_equivs=teq,tl_words=tl_words)
 
 
     def _get_textlines(self, region_element, namespace):
