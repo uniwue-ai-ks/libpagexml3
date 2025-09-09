@@ -227,19 +227,14 @@ class TLWord(TextEquivable):
         return PageRegionBB(xmin, ymin, xmax, ymax, None) # set it to none, as we don't know, if this is a text type
     
 
-        
-
-
-
-
 
 @dataclass
 class TextLine(PolygonRegionBase):
 
     id: str
     parent_region_id: str
-    polygon: np.array
-    baseline: np.array = None
+    polygon: np.ndarray
+    baseline: np.ndarray = None
     text_equivs: Dict[int, TextEquiv] = field(default_factory=dict)
     tl_words: Optional[List[TLWord]] = None
 
@@ -295,7 +290,7 @@ class TextLine(PolygonRegionBase):
 
 @dataclass
 class PageRegion(PolygonRegionBase):
-    polygon: np.array
+    polygon: np.ndarray
     region_type: PageRegionTypes
     region_text_type: PageXMLTextTypes = None
     region_id: str = None
@@ -549,6 +544,7 @@ class PageXMLParserTextMode(enum.Enum):
 # TODO: refactor this to be a pure parser.. this should return a PageXMLPage instance
 class PageXMLParser:
     _coords_regex = re.compile(r"([0-9]+)([.]?[0-9]*),([0-9]+)([.]?[0-9]*)")
+    _coords_valid_regex = re.compile(r"\s*([0-9]+\s*,\s*[0-9]+\s*)+")
     _rem_namespace_regex = re.compile("(?:[{][a-zA-Z0-9:/.-]+[}])?([a-zA-Z]+)")
     printed_strict_mode_warning = False
     def is_strict(self):
@@ -611,6 +607,9 @@ class PageXMLParser:
 
     def _polygon_from_coords_str(self, coords_str: str) -> np.array:
         points = []
+        # strictly check if the coords string is valid
+        if not PageXMLParser._coords_valid_regex.fullmatch(coords_str):
+            logger.warning(f"Invalid coords string {self.image_filename}: <\"{coords_str}\">")
         """for m in coords_str.split():
             if not m: continue
             x,y = m.split(",")
@@ -623,7 +622,6 @@ class PageXMLParser:
                 x = int(x * self.rescale_factor_x)  # TODO: maybe use round() here !?!
                 y = int(y * self.rescale_factor_y)
             points.append((x, y))
-        
         return np.array(points)
 
     def _remove_namespace_from_tag(self, tagstring):

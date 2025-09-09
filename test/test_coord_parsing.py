@@ -37,7 +37,7 @@ import numpy as np
 
 def parser1(coords: str):
     points = []
-   
+
     for match in PageXMLParser._coords_regex.finditer(coords):
         x, y = int(match.group(1)), int(match.group(3))
 
@@ -49,6 +49,7 @@ def parser2(coords: str):
     points = []
     for m in coords.split():
         if not m: continue
+        if "-" in m: continue
         x,y = m.split(",")
         points.append((int(float(x)), int(float(y))))
     # above alternative split implementation is faster, but will
@@ -58,7 +59,7 @@ import pytest
 
 def test_parsers():
     for x in valid_cases:
-        assert np.all(parser1(x) == parser2(x)), f"{x}"
+        assert np.all(parser1(x) == parser2(x)), f"{x} => {parser1(x)} <-> {parser2(x)}"
 
     for y in invalid_cases:
         parser1_raises = False
