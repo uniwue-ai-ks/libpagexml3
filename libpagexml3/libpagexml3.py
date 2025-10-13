@@ -433,7 +433,7 @@ class PageXMLPage:
     regions: List[PageRegion]
     _lookups: PageLookups = None
     reading_order: ReadingOrder = None
-    creator: str = None
+    creator: Optional[str] = None
     extra_elements: List[IExtraElement] = field(default_factory=list)
 
 
@@ -790,6 +790,21 @@ class PageXMLParser:
         if page is None:
             raise PageXMLInvalid("Cannot find Page Element in the Root of the PageXML")
 
+
+        # find the metadata element
+        metadata_elem = root.find(namespace+"Metadata")
+        self.metadata = {}
+        if metadata_elem:
+            creator_elem = metadata_elem.find(namespace+"Creator")
+            if creator_elem:
+                self.metadata["Creator"] = creator_elem.text
+            comments_elem = metadata_elem.find(namespace+"Comments")
+            if comments_elem:
+                self.metadata["Comments"] = comments_elem.text
+            
+
+
+
         # gather some things from the PageXML header
         self.image_filename, self.image_height, self.image_width = \
             str(page.attrib["imageFilename"]), \
@@ -817,6 +832,7 @@ class PageXMLParser:
         self.reading_order = ReadingOrder()
         self.regions = []
         reading_order_query = None
+
         for element in page:
             tagstr = self._remove_namespace_from_tag(element.tag)
             # check if we ignore this tag
@@ -912,7 +928,7 @@ class PageXMLParser:
 
     def get_page(self) -> PageXMLPage:
         page = PageXMLPage(image_filename=self.image_filename, image_width=self.image_width, image_height=self.image_height,
-                           regions = self.regions, created_on=datetime.datetime.now().isoformat(),
+                           regions = self.regions, created_on=datetime.datetime.now().isoformat(),creator=self.metadata["Creator"] if "Creator" in self.metadata else "",
                            last_edited=datetime.datetime.now().isoformat(), reading_order=self.reading_order,extra_elements=self.extra_elements)
         return page
 
