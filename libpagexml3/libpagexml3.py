@@ -100,6 +100,7 @@ class PageXMLTextTypes(enum.Enum):
     UNTERPUNKTET = 'unterpunktet'
     DOPPELT_UNTERSTRICHEN = 'doppelt_unterstrichen'
     ANGESTRICHEN = 'angestrichen'
+    FREMDE_LINIE = 'fremde_linie'
     ANDERE_LINIE = 'andere_linie'
     UNSICHER = 'unsicher'
 
