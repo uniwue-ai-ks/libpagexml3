@@ -415,12 +415,63 @@ class ExtraElementGeneric(IExtraElement):
     properties: dict
 
     def export(self) -> dict:
-        return {"id": self.id, 
-                "type": self.type.value, 
+        return {"id": self.id,
+                "type": self.type.value,
                 "shape": self.shape if isinstance(self.shape, list) else self.shape.tolist(),
                 "shape_type": self.shape_type,
                 "properties": self.properties
                }
+
+
+# Fulltext transcription text layer
+# Mirrors the TypeScript reference interfaces:
+#   FormattedTextSegment, FormattedLine, FormattedText, BlockData,
+#   BlockTaggedTextData, FulltextTranscription
+class BlockType(enum.Enum):
+    TAGGED_TEXT = 0
+
+
+@dataclass
+class FormattedTextSegment:
+    text: Optional[str]
+    class_: Optional[str] = None
+
+
+@dataclass
+class FormattedLine:
+    id: str
+    segments: List[FormattedTextSegment] = field(default_factory=list)
+
+
+@dataclass
+class FormattedText:
+    lines: List[FormattedLine] = field(default_factory=list)
+
+
+class IBlock(abc.ABC):
+    id: str
+    type: BlockType
+
+
+@dataclass
+class BlockTaggedText(IBlock):
+    id: str
+    tag: str
+    text: FormattedText = field(default_factory=FormattedText)
+    type: BlockType = BlockType.TAGGED_TEXT
+
+
+@dataclass
+class FulltextTranscription:
+    blocks: List[IBlock] = field(default_factory=list)
+
+
+@dataclass
+class TextLayers:
+    fulltext: Optional[FulltextTranscription] = None
+
+    def is_empty(self) -> bool:
+        return self.fulltext is None or not self.fulltext.blocks
 
 
 @dataclass
@@ -436,6 +487,7 @@ class PageXMLPage:
     reading_order: ReadingOrder = None
     creator: Optional[str] = None
     extra_elements: List[IExtraElement] = field(default_factory=list)
+    text_layers: TextLayers = field(default_factory=TextLayers)
 
 
     def rebuild_lookups(self):
@@ -610,12 +662,12 @@ class PageXMLParser:
         points = []
         # strictly check if the coords string is valid
         if not PageXMLParser._coords_valid_regex.fullmatch(coords_str):
-            logger.warning(f"Invalid coords string {self.image_filename}: <\"{coords_str}\">")
-        """for m in coords_str.split():
-            if not m: continue
-            x,y = m.split(",")
-            points.append((int(x), int(y)))
-        """ # above alternative split implementation is faster, but might not catch all possible errors during parsing
+            #logger.warning(f"Invalid coords string {self.image_filename}: <\"{coords_str}\">") # TODO: Fix coord parsing
+            """for m in coords_str.split():
+                if not m: continue
+                x,y = m.split(",")
+                points.append((int(x), int(y)))
+            """ # above alternative split implementation is faster, but might not catch all possible errors during parsing
         
         for match in PageXMLParser._coords_regex.finditer(coords_str):
             x, y = int(match.group(1)), int(match.group(3))
@@ -662,7 +714,7 @@ class PageXMLParser:
             #elif idx != 0 and idx != 1:
             #    raise PageXMLInvalid("Only supports Text Equiv index of 0 or 1")
             elif uc is None:
-                logger.warning(f"TextEquiv has no <Unicode> tag... Loading TextEquivText in {self.image_filename}")
+                # logger.warning(f"TextEquiv has no <Unicode> tag... Loading TextEquivText in {self.image_filename}") # TODO: how to handle this error?
                 teq[idx] = TextEquiv(index=idx, text=te.text or "")
             else:
                 teq[idx] = TextEquiv(index=idx, text=uc)
@@ -772,6 +824,38 @@ class PageXMLParser:
             else:
                 raise PageXMLInvalid(f"Unsupported Extra element: {e}")
 
+    def _parse_formatted_text(self, d: dict) -> FormattedText:
+        lines = []
+        for line in (d or {}).get("lines", []) or []:
+            segments = [
+                FormattedTextSegment(text=s.get("text"), class_=s.get("class"))
+                for s in line.get("segments", []) or []
+            ]
+            lines.append(FormattedLine(id=line["id"], segments=segments))
+        return FormattedText(lines=lines)
+
+    def _parse_fulltext_transcription(self, d: dict) -> FulltextTranscription:
+        blocks: List[IBlock] = []
+        for b in (d or {}).get("blocks", []) or []:
+            t = b.get("type")
+            if t == BlockType.TAGGED_TEXT.value:
+                blocks.append(BlockTaggedText(
+                    id=b["id"],
+                    tag=b.get("tag", ""),
+                    text=self._parse_formatted_text(b.get("text") or {}),
+                ))
+            else:
+                raise PageXMLInvalid(f"Unsupported fulltext block type: {t}")
+        return FulltextTranscription(blocks=blocks)
+
+    def _parse_text_layers(self, elem: ET.Element):
+        assert elem.attrib["name"] == "text_layers"
+        data = json.loads(elem.attrib["value"])
+        fulltext = None
+        if data.get("fulltext") is not None:
+            fulltext = self._parse_fulltext_transcription(data["fulltext"])
+        self.text_layers = TextLayers(fulltext=fulltext)
+
     def __init__(self, pagexml, filename=None, rescale=None, strictness:PageXMLParserMode = PageXMLParserMode.SUPERSTRICT,
                  text_mode: PageXMLParserTextMode = PageXMLParserTextMode.EQUIV):
         if rescale is not None:
@@ -782,6 +866,7 @@ class PageXMLParser:
         page: ET.Element = root.find(namespace + "Page")
         self.strictness = strictness
         self.extra_elements: List[IExtraElement] = []
+        self.text_layers: TextLayers = TextLayers()
         if not self.is_strict():
             if not PageXMLParser.printed_strict_mode_warning:
                 #logger.warning(f"Warn: Strict mode is disabled for libpagexml")
@@ -858,9 +943,12 @@ class PageXMLParser:
                     continue
                 self.regions.append(region)
             elif tagstr == "UserDefined":
-                user_attribute = element.find(namespace + "UserAttribute")
-                if user_attribute is not None and user_attribute.attrib["name"] == "extra_elements":
-                    self._parse_extra_elements(user_attribute)
+                for user_attribute in element.findall(namespace + "UserAttribute"):
+                    name = user_attribute.attrib.get("name")
+                    if name == "extra_elements":
+                        self._parse_extra_elements(user_attribute)
+                    elif name == "text_layers":
+                        self._parse_text_layers(user_attribute)
 
             elif tagstr in {"Relations"}:
                 pass # we do not care about the relations type
@@ -930,7 +1018,8 @@ class PageXMLParser:
     def get_page(self) -> PageXMLPage:
         page = PageXMLPage(image_filename=self.image_filename, image_width=self.image_width, image_height=self.image_height,
                            regions = self.regions, created_on=datetime.datetime.now().isoformat(),creator=self.metadata["Creator"] if "Creator" in self.metadata else "",
-                           last_edited=datetime.datetime.now().isoformat(), reading_order=self.reading_order,extra_elements=self.extra_elements)
+                           last_edited=datetime.datetime.now().isoformat(), reading_order=self.reading_order,extra_elements=self.extra_elements,
+                           text_layers=self.text_layers)
         return page
 
     def check_validity(self):
@@ -1051,19 +1140,80 @@ class PageXMLBuilder:
         # push the text equiv
         out.append("</TextLine>\n")
 
+    _XML_ATTR_TABLE = str.maketrans({
+        "<": "&lt;",
+        ">": "&gt;",
+        "&": "&amp;",
+        "'": "&apos;",
+        '"': "&quot;",
+    })
+
+    @classmethod
+    def _escape_attr(cls, value: str) -> str:
+        return value.translate(cls._XML_ATTR_TABLE)
+
+    @staticmethod
+    def _formatted_text_to_dict(t: FormattedText) -> dict:
+        return {
+            "lines": [
+                {
+                    "id": l.id,
+                    "segments": [
+                        {"text": s.text, "class": s.class_} for s in l.segments
+                    ],
+                }
+                for l in t.lines
+            ]
+        }
+
+    @classmethod
+    def _block_to_dict(cls, b: IBlock) -> dict:
+        if isinstance(b, BlockTaggedText):
+            return {
+                "type": b.type.value,
+                "id": b.id,
+                "tag": b.tag,
+                "text": cls._formatted_text_to_dict(b.text),
+            }
+        raise PageXMLInvalid(f"Unsupported block type for serialization: {type(b).__name__}")
+
+    @classmethod
+    def _text_layers_to_dict(cls, layers: TextLayers) -> dict:
+        out: dict = {}
+        if layers.fulltext is not None:
+            out["fulltext"] = {
+                "blocks": [cls._block_to_dict(b) for b in layers.fulltext.blocks]
+            }
+        return out
+
+    @classmethod
+    def push_user_defined(cls, out: List[str], page: PageXMLPage):
+        attrs: List[str] = []
+
+        extra_elements_data = json.dumps([x.export() for x in page.extra_elements])
+        attrs.append(
+            f'<UserAttribute name="extra_elements" description="Extra Elements on the page" '
+            f'type="extra_elements" value="{cls._escape_attr(extra_elements_data)}" />'
+        )
+
+        if page.text_layers is not None and not page.text_layers.is_empty():
+            text_layers_data = json.dumps(cls._text_layers_to_dict(page.text_layers))
+            attrs.append(
+                f'<UserAttribute name="text_layers" description="Text Layers (JSON encoded)" '
+                f'type="text_layers" value="{cls._escape_attr(text_layers_data)}" />'
+            )
+
+        out.append("\n<UserDefined>" + "".join(attrs) + "</UserDefined>")
+
     @classmethod
     def push_extra_elements(cls, out: List[str], extra_elements: List[IExtraElement]):
+        # Kept for backwards compatibility; prefer push_user_defined.
         elems = [x.export() for x in extra_elements]
         extra_elements_data = json.dumps(elems)
-
-        table = str.maketrans({
-            "<": "&lt;",
-            ">": "&gt;",
-            "&": "&amp;",
-            "'": "&apos;",
-            '"': "&quot;",
-        })
-        out.append(f'\n<UserDefined><UserAttribute name="extra_elements" description="Extra Elements on the page" type="extra_elements" value="{extra_elements_data.translate(table)}" /></UserDefined>')
+        out.append(
+            f'\n<UserDefined><UserAttribute name="extra_elements" description="Extra Elements on the page" '
+            f'type="extra_elements" value="{cls._escape_attr(extra_elements_data)}" /></UserDefined>'
+        )
 
     @classmethod
     def push_region(cls, out: List[str], reg: PageRegion):
@@ -1102,7 +1252,6 @@ class PageXMLBuilder:
 
         for reg in page.regions:
             cls.push_region(contents, reg)
-        #print(f"Pushing extra elements: {page.extra_elements}")
-        cls.push_extra_elements(contents, page.extra_elements)
+        cls.push_user_defined(contents, page)
         contents.append("\n</Page></PcGts>\n")
         return "".join(contents)
