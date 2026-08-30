@@ -459,6 +459,16 @@ class BlockTaggedText(IBlock):
     tag: str
     text: FormattedText = field(default_factory=FormattedText)
     type: BlockType = BlockType.TAGGED_TEXT
+    # Maps a FormattedLine id (the block-line's own id, which the frontend writes
+    # into the line's ``data-line-id`` attribute) to the polygon of the source
+    # TextLine the line was derived from. This lets the fulltext editor highlight
+    # the source line on the page for whichever line the caret is currently in.
+    line_polygons: Dict[str, np.ndarray] = field(default_factory=dict)
+    # Maps a FormattedLine id (the block-line's own id) to the id of the original
+    # ``TextLine`` in the source PageXML it was derived from. Kept separate from
+    # the FormattedLine id on purpose: the FormattedLine id is a fresh id owned by
+    # the text block, while this is a *reference* to a line elsewhere.
+    line_refs: Dict[str, str] = field(default_factory=dict)
 
 
 @dataclass
@@ -839,10 +849,17 @@ class PageXMLParser:
         for b in (d or {}).get("blocks", []) or []:
             t = b.get("type")
             if t == BlockType.TAGGED_TEXT.value:
+                line_polygons = {
+                    lid: np.array(points)
+                    for lid, points in (b.get("line_polygons") or {}).items()
+                }
+                line_refs = dict(b.get("line_refs") or {})
                 blocks.append(BlockTaggedText(
                     id=b["id"],
                     tag=b.get("tag", ""),
                     text=self._parse_formatted_text(b.get("text") or {}),
+                    line_polygons=line_polygons,
+                    line_refs=line_refs,
                 ))
             else:
                 raise PageXMLInvalid(f"Unsupported fulltext block type: {t}")
@@ -1169,12 +1186,20 @@ class PageXMLBuilder:
     @classmethod
     def _block_to_dict(cls, b: IBlock) -> dict:
         if isinstance(b, BlockTaggedText):
-            return {
+            out = {
                 "type": b.type.value,
                 "id": b.id,
                 "tag": b.tag,
                 "text": cls._formatted_text_to_dict(b.text),
             }
+            if b.line_polygons:
+                out["line_polygons"] = {
+                    lid: (poly.tolist() if isinstance(poly, np.ndarray) else poly)
+                    for lid, poly in b.line_polygons.items()
+                }
+            if b.line_refs:
+                out["line_refs"] = dict(b.line_refs)
+            return out
         raise PageXMLInvalid(f"Unsupported block type for serialization: {type(b).__name__}")
 
     @classmethod
